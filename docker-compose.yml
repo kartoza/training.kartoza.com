@@ -1,0 +1,103 @@
+version: '2'
+services:
+
+  # Keep all our containers up to date
+  # see https://github.com/containrrr/watchtower     
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 200m
+        max-file: '10'
+
+  mariadb:
+    image: docker.io/bitnami/mariadb:10.5
+    environment:
+      - ALLOW_EMPTY_PASSWORD=no
+      - MARIADB_USER=learning
+      - MARIADB_PASSWORD=V4t5Agr6rwLkU
+      - MARIADB_ROOT_PASSWORD=n9SKZskiKuCD4a
+      - MARIADB_DATABASE_PASSWORD=x5hM4XHmwn
+      - MARIADB_DATABASE=moodle
+      - MARIADB_CHARACTER_SET=utf8mb4
+      - MARIADB_COLLATE=utf8mb4_unicode_ci
+    volumes:
+      - ./docker_data/mariadb_data:/bitnami/mariadb
+    networks:
+     - moodle
+
+  moodle:
+    image: docker.io/bitnami/moodle:3
+    ports:
+      - '8080'
+      - '8443'
+    environment:
+      - MOODLE_DATABASE_HOST=mariadb
+      - MOODLE_DATABASE_PORT_NUMBER=3306
+      - MOODLE_DATABASE_PASSWORD=V4t5Agr6rwLkU
+      - MOODLE_DATABASE_USER=learning
+      - MOODLE_DATABASE_NAME=moodle
+      - ALLOW_EMPTY_PASSWORD=no
+      - MOODLE_USERNAME=kartoza
+      - MOODLE_PASSWORD=nuKAK9oVQd8WN
+      - MOODLE_EMAIL=info@kartoza.com
+      - MOODLE_SITE_NAME=training.kartoza.com
+      # Change to yes after initial setup
+      - MOODLE_SKIP_BOOTSTRAP=no
+    volumes:
+      - ./docker_data/moodle_data:/bitnami/moodle
+      - ./docker_data/moodle_user_data:/bitnami/moodledata
+    depends_on:
+      - mariadb
+    networks:
+     - moodle
+
+  nginx:
+    image: "nginx"
+    volumes:
+     - ./nginx_conf/nginx.conf:/etc/nginx/nginx.conf
+     - ./docker_data/certbot/certbot/conf:/etc/letsencrypt
+     - ./docker_data/certbot/certbot/www:/var/www/certbot
+    # This makes nginx reload its configuration (and certificates) every six hours in the background and launches nginx in the foreground.
+    # See https://medium.com/@pentacent/nginx-and-lets-encrypt-with-docker-in-less-than-5-minutes-b4b8a60d3a71
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+    ports:
+     - "80:80"
+     - "443:443"
+    networks:
+     - moodle
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 200m
+        max-file: '10'
+    depends_on:
+      - moodle
+
+  certbot:
+    image: certbot/certbot
+    # This checks every 12 hours if our cert is up for renewal and refreshes it if needed
+    # See https://medium.com/@pentacent/nginx-and-lets-encrypt-with-docker-in-less-than-5-minutes-b4b8a60d3a71
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    volumes:
+     - ./docker_data/certbot/certbot/conf:/etc/letsencrypt
+     - ./docker_data/certbot/certbot/www:/var/www/certbot
+
+        
+       #volumes:
+       #  mariadb_data:
+       #    driver: local
+       #  moodle_data:
+       #    driver: local
+       #  moodledata_data:
+       #    driver: local
+
+
+networks:
+  moodle:
+
