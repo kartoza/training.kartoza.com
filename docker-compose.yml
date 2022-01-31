@@ -30,6 +30,29 @@ services:
     networks:
      - moodle
 
+  db-backup:
+    build:
+      context: docker-mariadb-backup-master
+      dockerfile: Dockerfile
+    container_name: db-backup
+    image: tiredofit/mariadb-backup
+    links:
+     - mariadb
+    volumes:
+      - ./backups:/backups
+    environment:
+      - DB_SERVER=mariadb
+      - DB_NAME=moodle
+      - DB_USER=learning
+      - DB_PASSWORD="V4t5Agr6rwLkU"
+      - DB_DUMP_FREQ=1440
+      - DB_DUMP_BEGIN=0000
+      - DB_CLEANUP_TIME=8640
+      - MD5=TRUE
+      - COMPRESSION=XZ
+      - SPLIT_DB=FALSE
+    restart: always
+
   moodle:
     image: docker.io/bitnami/moodle:3
     ports:
